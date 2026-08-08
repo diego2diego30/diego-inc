@@ -1,0 +1,39 @@
+name: test-and-deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.TRADING_VPS_HOST }}
+          username: ${{ secrets.TRADING_VPS_USER }}
+          key: ${{ secrets.TRADING_VPS_SSH_KEY }}
+          port: ${{ secrets.TRADING_VPS_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/ecosystem/diego-inc
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose build hermes-telegram
+            docker compose up -d hermes-telegram
+            docker image prune -f
