@@ -12,6 +12,7 @@ services:
     volumes:
       - ./trading:/app/trading
       - trading-data:/app/data
+      - claude-credentials:/root/.claude
     command: ["telegram-daemon"]
 
   # Not a persistent service -- invoked on cron's schedule via:
@@ -26,7 +27,9 @@ services:
     volumes:
       - ./trading:/app/trading
       - trading-data:/app/data
+      - claude-credentials:/root/.claude
     entrypoint: ["python", "-m", "hermes.cli", "run-chain"]
 
 volumes:
   trading-data:
+  claude-credentials:

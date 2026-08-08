@@ -2,6 +2,7 @@
 # under systemd/docker-compose restart policy) and one-off `run-chain`
 # invocations (triggered by host cron via `docker compose run`).
 FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1
 
 # Node is required for the Claude Code CLI (`claude -p`), which the
 # orchestrator shells out to for every role in the chain (Section 1/4).
