@@ -1,0 +1,27 @@
+# Keeps the Hermes Telegram daemon container alive across reboots/crashes
+# (execution-plan.md Section 4: "systemd or pm2 to keep the Hermes process
+# alive"). Install:
+#
+#   sudo cp deploy/systemd/diego-trading-hermes.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now diego-trading-hermes
+#
+# Edit WorkingDirectory below to match wherever this repo is checked out
+# on the VPS.
+[Unit]
+Description=Diego, Inc. -- Trading instance Hermes (Telegram daemon)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ecosystem/diego-inc
+ExecStartPre=/usr/bin/docker compose build hermes-telegram
+ExecStart=/usr/bin/docker compose up hermes-telegram
+ExecStop=/usr/bin/docker compose down
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

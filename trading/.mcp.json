@@ -1,0 +1,9 @@
+{
+  "_comment": "Scoped to the trading instance only -- Claude Code discovers this by walking up from each role's cwd (trading/roles/<role>/). If your Claude Code version doesn't expand $HERMES_REPO_ROOT, hardcode the absolute path to mcp_servers/market_data/server.py on the VPS instead.",
+  "mcpServers": {
+    "market-data": {
+      "command": "python3",
+      "args": ["$HERMES_REPO_ROOT/mcp_servers/market_data/server.py"]
+    }
+  }
+}

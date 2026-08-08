@@ -1,0 +1,12 @@
+[project]
+name = "diego-inc-trading"
+version = "0.1.0"
+description = "Diego, Inc. -- Hermes orchestrator for the trading instance"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

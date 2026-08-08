@@ -1,0 +1,32 @@
+# Trading instance only. Deliberately no service here talks to the
+# Quinta55 container/network -- that repo/instance defines and runs its
+# own compose file entirely separately (execution-plan.md Section A/6).
+services:
+  hermes-telegram:
+    build: .
+    image: diego-inc-trading:latest
+    container_name: diego-trading-hermes
+    restart: unless-stopped
+    env_file:
+      - ./deploy/.env
+    volumes:
+      - ./trading:/app/trading
+      - trading-data:/app/data
+    command: ["telegram-daemon"]
+
+  # Not a persistent service -- invoked on cron's schedule via:
+  #   docker compose run --rm hermes-trading-chain --universe "SPY,QQQ"
+  # Kept as a profile so `docker compose up` doesn't start it directly.
+  hermes-trading-chain:
+    build: .
+    image: diego-inc-trading:latest
+    profiles: ["cron"]
+    env_file:
+      - ./deploy/.env
+    volumes:
+      - ./trading:/app/trading
+      - trading-data:/app/data
+    entrypoint: ["python", "-m", "hermes.cli", "run-chain"]
+
+volumes:
+  trading-data:

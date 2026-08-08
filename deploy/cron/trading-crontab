@@ -1,0 +1,16 @@
+# Host crontab for the periodic screener (execution-plan.md Section 1: a
+# daily/weekly screener, not an intraday loop -- see Section 5 for the
+# cost/evidence reasoning behind that cadence).
+#
+# Install: crontab -e   (as whatever user owns the docker group on the VPS)
+# then paste the line(s) below, adjusting the path to match your checkout.
+#
+# Recommended default: one daily screen on market-day mornings. Add a
+# separate weekly line only if/when Diego wants a deeper weekly review
+# pass (Section 5 table distinguishes "daily screen" from "weekly deep
+# review" -- deep review would run with different --universe/prompt
+# framing, not implemented as a separate command yet).
+
+# Daily screen, 09:35 America/New_York (5 min after cash-market open) --
+# adjust for the VPS's actual TZ / your watchlist.
+35 9 * * 1-5 cd /opt/ecosystem/diego-inc && /usr/bin/docker compose run --rm hermes-trading-chain --universe "SPY,QQQ" >> /opt/ecosystem/trading/logs/cron.log 2>&1
