@@ -66,8 +66,17 @@ def cmd_cost_report(args: argparse.Namespace) -> int:
     return 0
 
 
+BOT_COMMANDS = [
+    ("cost", "Show this month's spend report"),
+]
+
+
 def cmd_telegram_daemon(args: argparse.Namespace) -> int:
     bridge = TelegramBridge(config=TelegramConfig())
+    try:
+        bridge.set_commands(BOT_COMMANDS)
+    except Exception as exc:  # noqa: BLE001 - cosmetic; must not block the daemon starting
+        print(f"warning: setting bot command menu failed: {exc}", file=sys.stderr)
 
     def handle(text: str) -> None:
         print(f"received from Diego: {text}")

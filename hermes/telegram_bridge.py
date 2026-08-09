@@ -37,6 +37,19 @@ class TelegramBridge:
         )
         resp.raise_for_status()
 
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        """Registers Telegram's native "/" autocomplete menu. Only ever
+        list commands `handle()` actually acts on (see cli.py) -- a menu
+        entry for something that doesn't do anything from Telegram would
+        be a UI lie, not a convenience.
+        """
+        resp = requests.post(
+            self._url("setMyCommands"),
+            json={"commands": [{"command": c, "description": d} for c, d in commands]},
+            timeout=15,
+        )
+        resp.raise_for_status()
+
     def send_chain_summary(self, chain_result: dict) -> None:
         gate = chain_result["gate"]
         approved = chain_result["decision_approved"]
