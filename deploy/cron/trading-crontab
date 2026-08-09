@@ -14,4 +14,4 @@
 # Daily screen, 09:35 America/New_York (5 min after cash-market open) --
 # adjust for the VPS's actual TZ / your watchlist.
 CRON_TZ=America/New_York
-35 9 * * 1-5 cd /opt/ecosystem/diego-inc && /usr/bin/docker compose run --rm hermes-trading-chain --universe "SPY,QQQ" >> /opt/ecosystem/diego-inc/trading/logs/cron.log 2>&1
+35 9 * * 1-5 cd /root/diego-inc && /usr/bin/docker compose run --rm hermes-trading-chain --universe "SPY,QQQ" >> /root/diego-inc/trading/logs/cron.log 2>&1

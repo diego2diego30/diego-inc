@@ -8,16 +8,15 @@ CLI session that does have SSH access to the VPS.
 ## 1. Checkout on the VPS
 
 ```
-sudo mkdir -p /opt/ecosystem
-cd /opt/ecosystem
+cd /root
 git clone <this repo's URL> diego-inc
 cd diego-inc
 ```
 
 The `trading/` directory inside this checkout *is*
-`/opt/ecosystem/trading/` from execution-plan.md Section A — no separate
+`/root/diego-inc/trading/` from execution-plan.md Section A — no separate
 copy step needed as long as you check the repo out at
-`/opt/ecosystem/diego-inc`.
+`/root/diego-inc`.
 
 ## 2. Fill in real configuration
 

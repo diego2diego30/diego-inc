@@ -31,7 +31,7 @@ jobs:
           port: ${{ secrets.TRADING_VPS_PORT || 22 }}
           script: |
             set -e
-            cd /opt/ecosystem/diego-inc
+            cd /root/diego-inc
             git fetch origin main
             git reset --hard origin/main
             docker compose build hermes-telegram
