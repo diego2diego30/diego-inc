@@ -12,7 +12,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from hermes.config import LimitsConfig
+from hermes import chat
+from hermes.config import LimitsConfig, Paths
 from hermes.cost import CostLedger
 from hermes.limits import LimitsEngine
 from hermes.orchestrator import run_chain
@@ -82,6 +83,16 @@ def cmd_telegram_daemon(args: argparse.Namespace) -> int:
         # Confirm/reject wiring against a pending live-execution proposal
         # gets added here once Section 3 Gate 4 is opened and a real
         # broker integration exists (see hermes/execution_guard.py).
+
+        # Anything else: conversational fallback (hermes/chat.py). No tools,
+        # billed through the same CostLedger as the chain roles -- see that
+        # module's docstring. A failed reply must not crash the daemon, same
+        # as the cost-report path above.
+        try:
+            reply = chat.reply_to_message(text, paths=Paths())
+            bridge.send_status(reply)
+        except Exception as exc:  # noqa: BLE001 - a failed reply must not crash the daemon
+            print(f"warning: chat reply failed: {exc}", file=sys.stderr)
 
     bridge.poll_for_replies(handle)
     return 0

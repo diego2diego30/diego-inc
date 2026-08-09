@@ -102,6 +102,7 @@ DEFAULT_MODEL_BY_ROLE = {
     "trader": os.environ.get("MODEL_TRADER", "claude-sonnet-5"),
     "risk": os.environ.get("MODEL_RISK", "claude-sonnet-5"),
     "pm": os.environ.get("MODEL_PM", "claude-sonnet-5"),
+    "chat": os.environ.get("MODEL_CHAT", "claude-haiku-4-5-20251001"),
 }
 
 ROLE_CHAIN = ["analyst", "bull", "bear", "trader", "risk", "pm"]
