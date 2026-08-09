@@ -21,11 +21,24 @@ from hermes.logging_utils import RoleLogEntry, RunLogger
 from hermes.state import AccountState, GateState
 
 # Read-only for every role except Risk (which also gets the limits-check
-# tool) and PM (decision-only, still no write/execution tools). Concrete
-# MCP tool names get appended once Section 4's market-data MCP server is
-# wired in (see mcp_servers/market_data/).
+# tool) and PM (decision-only, still no write/execution tools).
+#
+# Only Analyst gets the market-data and accounts MCP tools (Section 4) --
+# Bull/Bear/Trader/Risk/PM reason over the Analyst's summary, not raw
+# feeds, per trading/roles/analyst/CLAUDE.md ("you are the first link in
+# the chain"). Both MCP servers (mcp_servers/market_data/,
+# mcp_servers/accounts/) are read-only by construction; there is no
+# order-placement or fund-transfer tool name to ever add here -- see
+# hermes/execution_guard.py.
 ROLE_ALLOWED_TOOLS = {
-    "analyst": ["Read", "Grep", "Glob"],
+    "analyst": [
+        "Read", "Grep", "Glob",
+        "mcp__market-data__get_price",
+        "mcp__market-data__get_technicals",
+        "mcp__market-data__get_news",
+        "mcp__accounts__get_account_balance",
+        "mcp__accounts__get_investment_holdings",
+    ],
     "bull": ["Read"],
     "bear": ["Read"],
     "trader": ["Read"],

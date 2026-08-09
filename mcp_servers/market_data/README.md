@@ -1,10 +1,15 @@
-# Market Data MCP Server (stub)
+# Market Data MCP Server
 
-Mock market-data source for the Analyst role. Every response is tagged
-`"mock": true`. Replace with a real provider before paper trading is
-meant to reflect real market conditions (backtest can run on real
-historical data separately; this stub is about giving the Analyst
-*something* to call today).
+Real market-data source for the Analyst role, backed by Alpaca's Market
+Data API. Every response is tagged `"mock": false`. (The earlier stub
+tagged every response `"mock": true` for the same reason -- so nothing
+downstream could ever mistake fabricated numbers for real ones.)
+
+## Setup
+
+1. Create a free Alpaca account and generate a market-data API key pair
+   (no brokerage/trading scope needed -- this server only ever reads).
+2. Set `ALPACA_API_KEY_ID` / `ALPACA_API_SECRET_KEY` in `deploy/.env`.
 
 ## Run locally
 
@@ -15,12 +20,14 @@ python server.py
 
 ## Wiring into Claude Code
 
-Add to the Analyst role's MCP config (or the instance-wide `.mcp.json`
-once created) as a stdio server pointing at this script. See
-`docs/execution-plan.md` Section 4.
+Registered in `trading/.mcp.json` as a stdio server. Only the Analyst
+role has it in `--allowedTools` (see `hermes/orchestrator.py`
+`ROLE_ALLOWED_TOOLS`) -- no other role reads market data directly.
 
-## Swapping in a real provider
+## Tools
 
-Keep the same three tool names (`get_price`, `get_technicals`,
-`get_news`) so nothing else in the repo needs to change — just point the
-Analyst's MCP config at the new server process.
+- `get_price(ticker)` -- last trade price, most recent daily volume
+- `get_technicals(ticker)` -- SMA-50, SMA-200, RSI-14 from daily bars
+  (fields are `null`, not guessed, when there isn't enough history yet)
+- `get_news(ticker, limit=5)` -- recent headlines, always tagged
+  `"confidence": "low"` per `docs/execution-plan.md` Section 1

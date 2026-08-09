@@ -19,8 +19,10 @@ WORKDIR /app
 
 COPY requirements.txt ./
 COPY mcp_servers/market_data/requirements.txt ./mcp_servers/market_data/requirements.txt
+COPY mcp_servers/accounts/requirements.txt ./mcp_servers/accounts/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir -r mcp_servers/market_data/requirements.txt
+    && pip install --no-cache-dir -r mcp_servers/market_data/requirements.txt \
+    && pip install --no-cache-dir -r mcp_servers/accounts/requirements.txt
 
 COPY . .
 

@@ -1,9 +1,13 @@
 {
-  "_comment": "Scoped to the trading instance only -- Claude Code discovers this by walking up from each role's cwd (trading/roles/<role>/). If your Claude Code version doesn't expand $HERMES_REPO_ROOT, hardcode the absolute path to mcp_servers/market_data/server.py on the VPS instead.",
+  "_comment": "Scoped to the trading instance only -- Claude Code discovers this by walking up from each role's cwd (trading/roles/<role>/). If your Claude Code version doesn't expand $HERMES_REPO_ROOT, hardcode the absolute path to the server scripts on the VPS instead. Only the Analyst role has these tools in --allowedTools (see hermes/orchestrator.py ROLE_ALLOWED_TOOLS) -- registering a server here does not by itself grant any role access to it.",
   "mcpServers": {
     "market-data": {
       "command": "python3",
       "args": ["$HERMES_REPO_ROOT/mcp_servers/market_data/server.py"]
+    },
+    "accounts": {
+      "command": "python3",
+      "args": ["$HERMES_REPO_ROOT/mcp_servers/accounts/server.py"]
     }
   }
 }

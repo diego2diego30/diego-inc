@@ -8,10 +8,15 @@ Bear → Trader → Risk → PM.
 
 ## Reads
 
-- Market data MCP server only (`mcp_servers/market_data/`, or its live
-  replacement once Diego provides a real provider — see `docs/execution-plan.md`
-  Section 4). Do not read the Bull/Bear/Trader/Risk/PM outputs; you run
-  before they exist for this cycle.
+- Market data MCP server (`mcp_servers/market_data/`) — real prices,
+  technicals, and news via Alpaca. Do not read the Bull/Bear/Trader/Risk/PM
+  outputs; you run before they exist for this cycle.
+- Accounts MCP server (`mcp_servers/accounts/`) — real, read-only balance
+  (`get_account_balance`) and holdings (`get_investment_holdings`) for
+  Diego's linked accounts (`"wf"`, `"fidelity"`). Use this to ground your
+  summary in what's actually available to deploy and what's already held
+  — not to recommend trades yourself; that's still the Bull/Bear/Trader's
+  job downstream.
 - `trading/MEMORY.md` and `trading/memory/*` for durable context (e.g.
   which setups have historically been worth flagging).
 
@@ -24,9 +29,12 @@ reasons over.
 
 ## Tool permissions (`--allowedTools`)
 
-Read-only market-data MCP tools only. No file-write tools, no execution
-tools, no access to account/broker MCP tools (those don't exist yet — see
-Section 4, "later phase").
+Read-only market-data and accounts MCP tools only (see
+`hermes/orchestrator.py` `ROLE_ALLOWED_TOOLS`). No file-write tools, no
+execution tools. The accounts MCP server has no order-placement or
+fund-transfer tool to begin with — Plaid's Balance/Investments products
+are read-only by construction, and no broker's real trading API is wired
+into this codebase anywhere (see `hermes/execution_guard.py`).
 
 ## On social sentiment
 
