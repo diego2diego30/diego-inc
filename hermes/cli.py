@@ -4,6 +4,7 @@ human-only gate/circuit-breaker actions) actually invoke.
     python -m hermes.cli run-chain --universe "SPY,QQQ"
     python -m hermes.cli open-gate --gate paper --confirmed-by diego
     python -m hermes.cli resume-circuit-breaker --confirmed-by diego
+    python -m hermes.cli cost-report
     python -m hermes.cli telegram-daemon
 """
 from __future__ import annotations
@@ -12,10 +13,17 @@ import argparse
 import sys
 
 from hermes.config import LimitsConfig
+from hermes.cost import CostLedger
 from hermes.limits import LimitsEngine
 from hermes.orchestrator import run_chain
 from hermes.state import AccountState, GateState
 from hermes.telegram_bridge import TelegramBridge, TelegramConfig
+
+# Words that trigger an on-demand cost report over Telegram (Section 5:
+# Diego asked to be able to check projected usage cost on demand, not just
+# see it in cron output). Matched case-insensitively against the whole
+# message so "cost", "Cost?", "/cost" all work.
+COST_REPORT_TRIGGERS = {"cost", "/cost", "cost report", "costs", "usage", "spend"}
 
 
 def cmd_run_chain(args: argparse.Namespace) -> int:
@@ -51,11 +59,26 @@ def cmd_resume_circuit_breaker(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cost_report(args: argparse.Namespace) -> int:
+    report = CostLedger().report()
+    print(report.as_text())
+    return 0
+
+
 def cmd_telegram_daemon(args: argparse.Namespace) -> int:
     bridge = TelegramBridge(config=TelegramConfig())
 
     def handle(text: str) -> None:
         print(f"received from Diego: {text}")
+
+        if text.strip().lower() in COST_REPORT_TRIGGERS:
+            report = CostLedger().report()
+            try:
+                bridge.send_status(report.as_text())
+            except Exception as exc:  # noqa: BLE001 - a failed reply must not crash the daemon
+                print(f"warning: cost report reply failed: {exc}", file=sys.stderr)
+            return
+
         # Confirm/reject wiring against a pending live-execution proposal
         # gets added here once Section 3 Gate 4 is opened and a real
         # broker integration exists (see hermes/execution_guard.py).
@@ -80,6 +103,9 @@ def main() -> int:
     p_resume = sub.add_parser("resume-circuit-breaker", help="Manually clear a tripped circuit breaker -- human-only")
     p_resume.add_argument("--confirmed-by", required=True, help="Must be 'diego'")
     p_resume.set_defaults(func=cmd_resume_circuit_breaker)
+
+    p_cost = sub.add_parser("cost-report", help="Print month-to-date spend, projection, and cap status")
+    p_cost.set_defaults(func=cmd_cost_report)
 
     p_tg = sub.add_parser("telegram-daemon", help="Long-running process that listens for Diego's replies")
     p_tg.set_defaults(func=cmd_telegram_daemon)

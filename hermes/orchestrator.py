@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from hermes.config import DEFAULT_MODEL_BY_ROLE, ROLE_CHAIN, LimitsConfig, Paths
+from hermes.cost import BudgetExceeded, CostLedger, RunLock, cost_from_claude_response
 from hermes.execution_guard import LiveExecutionNotAuthorized, assert_live_execution_authorized
 from hermes.limits import Decision, LimitsEngine, Proposal
 from hermes.logging_utils import RoleLogEntry, RunLogger
@@ -88,6 +89,7 @@ def run_chain(
     paths = paths or Paths()
     limits_config = limits_config or LimitsConfig()
     logger = RunLogger(paths=paths)
+    ledger = CostLedger(paths=paths)
 
     gate_state = GateState.load()
     account = AccountState.load().roll_day_if_needed()
@@ -95,72 +97,104 @@ def run_chain(
 
     logger.log_event("chain_start", f"instrument_universe={instrument_universe} gate={gate_state.gate}")
 
+    run_cost_usd = 0.0
+
+    def _bill(role: str, result: "RoleResult") -> None:
+        nonlocal run_cost_usd
+        usage = cost_from_claude_response(role, DEFAULT_MODEL_BY_ROLE[role], result.raw, run_id=logger.run_id)
+        ledger.record(usage)
+        run_cost_usd += usage.cost_usd
+        # Checked after every role, not just at chain end, so a single
+        # pathological call is cut off mid-chain instead of after all six
+        # roles have already billed.
+        ledger.assert_run_within_cap(run_cost_usd)
+
     try:
-        analyst = _run_role("analyst", f"Analyze current market state for: {instrument_universe}", paths)
-        logger.log_role(RoleLogEntry(role="analyst", model=DEFAULT_MODEL_BY_ROLE["analyst"],
-                                      reasoning=analyst.text, output=analyst.raw))
+        # Section 5: a hard spend cap, checked before any billed call is
+        # made -- inside the try so a tripped cap is logged as
+        # budget_blocked, not just raised bare.
+        ledger.assert_within_budget()
 
-        bull = _run_role("bull", f"Analyst output:\n{analyst.text}\n\nBuild the strongest case FOR a position.", paths)
-        logger.log_role(RoleLogEntry(role="bull", model=DEFAULT_MODEL_BY_ROLE["bull"],
-                                      reasoning=bull.text, output=bull.raw))
+        # RunLock guards the entire billed portion of the chain -- see
+        # hermes/cost.py: a hung `claude -p` call under an overlapping
+        # cron/manual trigger would otherwise accumulate one billing
+        # process per trigger.
+        with RunLock(paths=paths):
+            analyst = _run_role("analyst", f"Analyze current market state for: {instrument_universe}", paths)
+            logger.log_role(RoleLogEntry(role="analyst", model=DEFAULT_MODEL_BY_ROLE["analyst"],
+                                          reasoning=analyst.text, output=analyst.raw))
+            _bill("analyst", analyst)
 
-        bear = _run_role("bear", f"Analyst output:\n{analyst.text}\n\nBuild the strongest case AGAINST a position.", paths)
-        logger.log_role(RoleLogEntry(role="bear", model=DEFAULT_MODEL_BY_ROLE["bear"],
-                                      reasoning=bear.text, output=bear.raw))
+            bull = _run_role("bull", f"Analyst output:\n{analyst.text}\n\nBuild the strongest case FOR a position.", paths)
+            logger.log_role(RoleLogEntry(role="bull", model=DEFAULT_MODEL_BY_ROLE["bull"],
+                                          reasoning=bull.text, output=bull.raw))
+            _bill("bull", bull)
 
-        trader = _run_role(
-            "trader",
-            f"Bull case:\n{bull.text}\n\nBear case:\n{bear.text}\n\n"
-            f"Propose a specific position and size (sized for a longer hold).",
-            paths,
+            bear = _run_role("bear", f"Analyst output:\n{analyst.text}\n\nBuild the strongest case AGAINST a position.", paths)
+            logger.log_role(RoleLogEntry(role="bear", model=DEFAULT_MODEL_BY_ROLE["bear"],
+                                          reasoning=bear.text, output=bear.raw))
+            _bill("bear", bear)
+
+            trader = _run_role(
+                "trader",
+                f"Bull case:\n{bull.text}\n\nBear case:\n{bear.text}\n\n"
+                f"Propose a specific position and size (sized for a longer hold).",
+                paths,
+            )
+            logger.log_role(RoleLogEntry(role="trader", model=DEFAULT_MODEL_BY_ROLE["trader"],
+                                          reasoning=trader.text, output=trader.raw))
+            _bill("trader", trader)
+
+            # Section 2: hard limits are enforced here in code, not left to
+            # the Risk role's prompt to reason about correctly.
+            proposal = _parse_proposal(trader.text, instrument_universe)
+            engine = LimitsEngine(limits_config, account)
+            decision = engine.evaluate_proposal(proposal)
+            account.save()
+            logger.log_event("limits_decision", json.dumps({
+                "approved": decision.approved,
+                "size_pct_of_account": decision.size_pct_of_account,
+                "reasons": decision.reasons,
+                "halted": decision.halted,
+            }))
+
+            risk = _run_role(
+                "risk",
+                f"Trader proposal:\n{trader.text}\n\n"
+                f"Hard-limit engine decision (authoritative, do not override):\n{decision}",
+                paths,
+            )
+            logger.log_role(RoleLogEntry(role="risk", model=DEFAULT_MODEL_BY_ROLE["risk"],
+                                          reasoning=risk.text, output=risk.raw))
+            _bill("risk", risk)
+
+            pm = _run_role(
+                "pm",
+                f"Full chain for this cycle:\nAnalyst: {analyst.text}\nBull: {bull.text}\nBear: {bear.text}\n"
+                f"Trader: {trader.text}\nRisk manager: {risk.text}\nLimits decision: {decision}\n\n"
+                f"Approve, reject, or escalate.",
+                paths,
+            )
+            logger.log_role(RoleLogEntry(role="pm", model=DEFAULT_MODEL_BY_ROLE["pm"],
+                                          reasoning=pm.text, output=pm.raw))
+            _bill("pm", pm)
+
+            # Even a PM "approve" never reaches real execution without an
+            # explicit, human-confirmed Gate 4+. This call exists so that
+            # future real-execution wiring has exactly one place to hook in,
+            # and so today it visibly (and loudly) refuses.
+            try:
+                assert_live_execution_authorized(gate_state)
+                live_authorized = True
+            except LiveExecutionNotAuthorized as exc:
+                live_authorized = False
+                logger.log_event("live_execution_blocked", str(exc))
+
+        logger.log_event(
+            "chain_end",
+            f"decision_approved={decision.approved} live_authorized={live_authorized} "
+            f"run_cost_usd={run_cost_usd:.4f}",
         )
-        logger.log_role(RoleLogEntry(role="trader", model=DEFAULT_MODEL_BY_ROLE["trader"],
-                                      reasoning=trader.text, output=trader.raw))
-
-        # Section 2: hard limits are enforced here in code, not left to
-        # the Risk role's prompt to reason about correctly.
-        proposal = _parse_proposal(trader.text, instrument_universe)
-        engine = LimitsEngine(limits_config, account)
-        decision = engine.evaluate_proposal(proposal)
-        account.save()
-        logger.log_event("limits_decision", json.dumps({
-            "approved": decision.approved,
-            "size_pct_of_account": decision.size_pct_of_account,
-            "reasons": decision.reasons,
-            "halted": decision.halted,
-        }))
-
-        risk = _run_role(
-            "risk",
-            f"Trader proposal:\n{trader.text}\n\n"
-            f"Hard-limit engine decision (authoritative, do not override):\n{decision}",
-            paths,
-        )
-        logger.log_role(RoleLogEntry(role="risk", model=DEFAULT_MODEL_BY_ROLE["risk"],
-                                      reasoning=risk.text, output=risk.raw))
-
-        pm = _run_role(
-            "pm",
-            f"Full chain for this cycle:\nAnalyst: {analyst.text}\nBull: {bull.text}\nBear: {bear.text}\n"
-            f"Trader: {trader.text}\nRisk manager: {risk.text}\nLimits decision: {decision}\n\n"
-            f"Approve, reject, or escalate.",
-            paths,
-        )
-        logger.log_role(RoleLogEntry(role="pm", model=DEFAULT_MODEL_BY_ROLE["pm"],
-                                      reasoning=pm.text, output=pm.raw))
-
-        # Even a PM "approve" never reaches real execution without an
-        # explicit, human-confirmed Gate 4+. This call exists so that
-        # future real-execution wiring has exactly one place to hook in,
-        # and so today it visibly (and loudly) refuses.
-        try:
-            assert_live_execution_authorized(gate_state)
-            live_authorized = True
-        except LiveExecutionNotAuthorized as exc:
-            live_authorized = False
-            logger.log_event("live_execution_blocked", str(exc))
-
-        logger.log_event("chain_end", f"decision_approved={decision.approved} live_authorized={live_authorized}")
 
         return {
             "gate": gate_state.gate,
@@ -169,7 +203,11 @@ def run_chain(
             "live_authorized": live_authorized,
             "pm_summary": pm.text,
             "log_path": str(logger.log_path),
+            "run_cost_usd": run_cost_usd,
         }
+    except BudgetExceeded as exc:
+        logger.log_event("budget_blocked", str(exc))
+        raise
     except Exception as exc:  # noqa: BLE001 - deliberately broad: log then re-raise
         logger.log_event("chain_error", str(exc))
         raise
