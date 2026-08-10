@@ -30,20 +30,40 @@ COST_REPORT_TRIGGERS = {"cost", "/cost", "cost report", "costs", "usage", "spend
 # same trigger/message in the Quinta55 instance's hermes/cli.py.
 HTML_TEST_TRIGGERS = {"html test", "/htmltest", "htmltest"}
 
+# Deliberately exercises every HTML tag Telegram's Bot API supports except
+# <tg-emoji> and tg://user inline mentions -- both need a live custom-emoji
+# id / real user id this hard-coded test can't safely fabricate, and a bad
+# one would 400 the whole message instead of just degrading gracefully.
 HTML_DEMO_MESSAGE = (
     "<b>HTML formatting test</b> ([trading] bot)\n\n"
+    "<b>Basic styles</b>\n"
     "<b>Bold</b> / <strong>Bold</strong>\n"
     "<i>Italic</i> / <em>Italic</em>\n"
     "<u>Underline</u> / <ins>Underline</ins>\n"
     "<s>Strikethrough</s> / <strike>Strikethrough</strike> / <del>Strikethrough</del>\n"
-    "<b><i>Bold italic</i></b>\n"
-    "<span class=\"tg-spoiler\">Spoiler (tap to reveal)</span>\n"
+    "<span class=\"tg-spoiler\">Spoiler (tap to reveal)</span> / <tg-spoiler>Spoiler</tg-spoiler>\n\n"
+    "<b>Nested combination</b>\n"
+    "<b>bold, <i>italic bold, <s>italic bold strikethrough, "
+    "<span class=\"tg-spoiler\">italic bold strikethrough spoiler</span></s>, "
+    "<u>underline italic bold</u></i>, bold</b>\n\n"
+    "<b>Links</b>\n"
     "<a href=\"https://telegram.org\">Inline link</a>\n"
+    "<b><a href=\"https://core.telegram.org/bots/api#html-style\">Bold inline link</a></b>\n\n"
+    "<b>Code</b>\n"
     "<code>inline fixed-width code</code>\n\n"
     "<pre>Pre-formatted block\nno syntax highlighting</pre>\n\n"
-    "<pre><code class=\"language-python\">def hello():\n    return \"hi\"</code></pre>\n\n"
-    "<blockquote>Regular blockquote</blockquote>\n\n"
-    "<blockquote expandable>Expandable blockquote -- tap to expand/collapse.</blockquote>"
+    "<pre><code class=\"language-python\">def hello(name: str) -&gt; str:\n"
+    "    return f\"Hello, {name}!\"</code></pre>\n\n"
+    "<pre><code class=\"language-bash\">echo \"bot online\" &amp;&amp; exit 0</code></pre>\n\n"
+    "<b>Quotes</b>\n"
+    "<blockquote>Regular blockquote -- always visible, no interaction.</blockquote>\n\n"
+    "<blockquote expandable>Expandable blockquote first line\n"
+    "Second line, still visible\n"
+    "Third line -- tap to expand and see the rest\n"
+    "Fourth line, only visible when expanded\n"
+    "Fifth and last line of the quote.</blockquote>\n\n"
+    "<b>Escaped literal characters</b>\n"
+    "5 &lt; 10, 10 &gt; 5, cats &amp; dogs."
 )
 
 
