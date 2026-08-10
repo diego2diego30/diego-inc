@@ -10,6 +10,7 @@ hard-coded — see hermes/config.py).
 """
 from __future__ import annotations
 
+import html
 import sys
 import time
 from dataclasses import dataclass
@@ -29,10 +30,19 @@ class TelegramBridge:
     def _url(self, method: str) -> str:
         return f"{API_BASE.format(token=self.config.bot_token)}/{method}"
 
-    def send_status(self, text: str) -> None:
+    def send_status(self, text: str, *, escape: bool = True) -> None:
+        """escape=False is only for trusted, hard-coded HTML built in this
+        codebase (e.g. the html-test demo in cli.py) -- never pass through
+        text that originated from Telegram, an LLM, or any other untrusted
+        source with escape=False.
+        """
         resp = requests.post(
             self._url("sendMessage"),
-            json={"chat_id": self.config.chat_id, "text": text},
+            json={
+                "chat_id": self.config.chat_id,
+                "text": html.escape(text) if escape else text,
+                "parse_mode": "HTML",
+            },
             timeout=15,
         )
         resp.raise_for_status()
