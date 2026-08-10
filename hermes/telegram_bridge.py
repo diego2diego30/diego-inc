@@ -32,7 +32,7 @@ class TelegramBridge:
     def send_status(self, text: str) -> None:
         resp = requests.post(
             self._url("sendMessage"),
-            json={"chat_id": self.config.chat_id, "text": text},
+            json={"chat_id": self.config.chat_id, "text": text, "parse_mode": "MarkdownV2"},
             timeout=15,
         )
         resp.raise_for_status()
