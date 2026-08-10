@@ -26,6 +26,26 @@ from hermes.telegram_bridge import TelegramBridge, TelegramConfig
 # message so "cost", "Cost?", "/cost" all work.
 COST_REPORT_TRIGGERS = {"cost", "/cost", "cost report", "costs", "usage", "spend"}
 
+# On-demand check that HTML parse_mode is rendering as expected -- see the
+# same trigger/message in the Quinta55 instance's hermes/cli.py.
+HTML_TEST_TRIGGERS = {"html test", "/htmltest", "htmltest"}
+
+HTML_DEMO_MESSAGE = (
+    "<b>HTML formatting test</b> ([trading] bot)\n\n"
+    "<b>Bold</b> / <strong>Bold</strong>\n"
+    "<i>Italic</i> / <em>Italic</em>\n"
+    "<u>Underline</u> / <ins>Underline</ins>\n"
+    "<s>Strikethrough</s> / <strike>Strikethrough</strike> / <del>Strikethrough</del>\n"
+    "<b><i>Bold italic</i></b>\n"
+    "<span class=\"tg-spoiler\">Spoiler (tap to reveal)</span>\n"
+    "<a href=\"https://telegram.org\">Inline link</a>\n"
+    "<code>inline fixed-width code</code>\n\n"
+    "<pre>Pre-formatted block\nno syntax highlighting</pre>\n\n"
+    "<pre><code class=\"language-python\">def hello():\n    return \"hi\"</code></pre>\n\n"
+    "<blockquote>Regular blockquote</blockquote>\n\n"
+    "<blockquote expandable>Expandable blockquote -- tap to expand/collapse.</blockquote>"
+)
+
 
 def cmd_run_chain(args: argparse.Namespace) -> int:
     result = run_chain(instrument_universe=args.universe)
@@ -68,6 +88,7 @@ def cmd_cost_report(args: argparse.Namespace) -> int:
 
 BOT_COMMANDS = [
     ("cost", "Show this month's spend report"),
+    ("htmltest", "Send an HTML formatting demo"),
 ]
 
 
@@ -87,6 +108,13 @@ def cmd_telegram_daemon(args: argparse.Namespace) -> int:
                 bridge.send_status(report.as_text())
             except Exception as exc:  # noqa: BLE001 - a failed reply must not crash the daemon
                 print(f"warning: cost report reply failed: {exc}", file=sys.stderr)
+            return
+
+        if text.strip().lower() in HTML_TEST_TRIGGERS:
+            try:
+                bridge.send_status(HTML_DEMO_MESSAGE, escape=False)
+            except Exception as exc:  # noqa: BLE001 - a failed reply must not crash the daemon
+                print(f"warning: html test reply failed: {exc}", file=sys.stderr)
             return
 
         # Confirm/reject wiring against a pending live-execution proposal
