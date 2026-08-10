@@ -66,6 +66,27 @@ HTML_DEMO_MESSAGE = (
     "5 &lt; 10, 10 &gt; 5, cats &amp; dogs."
 )
 
+# On-demand check that the *separate* sendRichMessage API (tables, headings,
+# etc. -- see https://core.telegram.org/bots/api#rich-message-formatting-options)
+# is reachable and rendering. Distinct from HTML_TEST_TRIGGERS, which only
+# exercises the much smaller sendMessage/parse_mode=HTML tag set.
+RICH_TEST_TRIGGERS = {"rich test", "/richtest", "richtest", "table test"}
+
+RICH_DEMO_HTML = (
+    "<h2>Rich message test</h2>\n"
+    "<p>[trading] bot -- verifying <b>sendRichMessage</b> table support "
+    "(colspan, alignment, borders, striping, caption).</p>\n"
+    "<table bordered striped>\n"
+    "<caption>System status</caption>\n"
+    "<tr><th>Metric</th><th>Value</th><th>Status</th></tr>\n"
+    "<tr><td>Bot</td><td>online</td><td align=\"center\"><b>OK</b></td></tr>\n"
+    "<tr><td>Parse mode</td><td>HTML + Rich</td><td align=\"center\"><b>OK</b></td></tr>\n"
+    "<tr><td colspan=\"3\" align=\"center\">All systems normal</td></tr>\n"
+    "</table>\n"
+    "<p>If this rendered as an actual bordered, striped table with a merged "
+    "bottom row -- <code>sendRichMessage</code> is working end to end.</p>"
+)
+
 
 def cmd_run_chain(args: argparse.Namespace) -> int:
     result = run_chain(instrument_universe=args.universe)
@@ -109,6 +130,7 @@ def cmd_cost_report(args: argparse.Namespace) -> int:
 BOT_COMMANDS = [
     ("cost", "Show this month's spend report"),
     ("htmltest", "Send an HTML formatting demo"),
+    ("richtest", "Send a rich-message table demo"),
 ]
 
 
@@ -135,6 +157,13 @@ def cmd_telegram_daemon(args: argparse.Namespace) -> int:
                 bridge.send_status(HTML_DEMO_MESSAGE, escape=False)
             except Exception as exc:  # noqa: BLE001 - a failed reply must not crash the daemon
                 print(f"warning: html test reply failed: {exc}", file=sys.stderr)
+            return
+
+        if text.strip().lower() in RICH_TEST_TRIGGERS:
+            try:
+                bridge.send_rich_status(RICH_DEMO_HTML)
+            except Exception as exc:  # noqa: BLE001 - a failed reply must not crash the daemon
+                print(f"warning: rich test reply failed: {exc}", file=sys.stderr)
             return
 
         # Confirm/reject wiring against a pending live-execution proposal
