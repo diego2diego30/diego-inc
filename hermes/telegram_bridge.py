@@ -10,6 +10,7 @@ hard-coded — see hermes/config.py).
 """
 from __future__ import annotations
 
+import html
 import sys
 import time
 from dataclasses import dataclass
@@ -32,7 +33,7 @@ class TelegramBridge:
     def send_status(self, text: str) -> None:
         resp = requests.post(
             self._url("sendMessage"),
-            json={"chat_id": self.config.chat_id, "text": text, "parse_mode": "MarkdownV2"},
+            json={"chat_id": self.config.chat_id, "text": html.escape(text), "parse_mode": "HTML"},
             timeout=15,
         )
         resp.raise_for_status()
