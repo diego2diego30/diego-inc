@@ -47,6 +47,26 @@ class TelegramBridge:
         )
         resp.raise_for_status()
 
+    def send_rich_status(self, rich_html: str) -> None:
+        """Sends a structured rich message via sendRichMessage -- a
+        separate, much larger Bot API surface than send_status's plain
+        sendMessage/parse_mode=HTML (tables, headings, lists, blockquotes
+        with <cite>, collapsible <details>, etc.; see
+        https://core.telegram.org/bots/api#rich-message-formatting-options).
+        rich_html must be trusted, pre-built markup -- manually escape any
+        dynamic/untrusted content embedded in it (e.g. via html.escape())
+        before calling this, the same rule as send_status(escape=False).
+        """
+        resp = requests.post(
+            self._url("sendRichMessage"),
+            json={
+                "chat_id": self.config.chat_id,
+                "rich_message": {"html": rich_html},
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         """Registers Telegram's native "/" autocomplete menu. Only ever
         list commands `handle()` actually acts on (see cli.py) -- a menu
